@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+// The roster people are assigned from. Only name, email and group are kept:
+// any other column in an imported file is dropped before it reaches here.
+
+message Person {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  // Cohort, department, class: whatever the organisation groups by.
+  string group = 4;
+  int64 created_at = 5;
+}
+
+// A person as a file or a form supplies one, before it has an id.
+message PersonDraft {
+  string name = 1;
+  string email = 2;
+  string group = 3;
+}
+
+service PersonService {
+  rpc ListPeople(ListPeopleRequest) returns (ListPeopleResponse);
+  rpc AddPerson(AddPersonRequest) returns (AddPersonResponse);
+  // Everyone in the list ends up on the roster once. Existing emails are
+  // matched case-insensitively, never duplicated.
+  rpc EnsurePeople(EnsurePeopleRequest) returns (EnsurePeopleResponse);
+  // Also cancels the person's assignments: no dangling invitations.
+  rpc DeletePerson(DeletePersonRequest) returns (DeletePersonResponse);
+  // The right to erasure (UU PDP art. 8): everything held about the person,
+  // attempts and credentials included, is deleted for good. The audit log
+  // keeps that it happened, by id only.
+  rpc ErasePerson(ErasePersonRequest) returns (ErasePersonResponse);
+}
+
+message ListPeopleRequest {}
+
+message ListPeopleResponse {
+  repeated Person people = 1;
+}
+
+message AddPersonRequest {
+  PersonDraft person = 1;
+}
+
+message AddPersonResponse {
+  Person person = 1;
+}
+
+message EnsurePeopleRequest {
+  // At most 5,000 rows, the same cap as a roster file.
+  repeated PersonDraft people = 1;
+}
+
+message EnsurePeopleResponse {
+  // In input order, one per distinct email, new or existing.
+  repeated string ids = 1;
+  int32 created = 2;
+  repeated Person people = 3;
+}
+
+message DeletePersonRequest {
+  string id = 1;
+}
+
+message DeletePersonResponse {}
+
+message ErasePersonRequest {
+  string id = 1;
+  // Why, for the audit log: e.g. "request from the candidate, ticket 123".
+  // Must not itself contain personal data.
+  string reason = 2;
+}
+
+message ErasePersonResponse {
+  int32 attempts = 1;
+  int32 credentials = 2;
+  int32 images = 3;
+}

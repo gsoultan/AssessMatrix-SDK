@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+import "assessmatrix/v1/auth.proto";
+
+// First-run setup: the super administrator and the default tenant, whose
+// administrator they also are. Open only while the database holds no tenant; the
+// database itself refuses a second one (am_setup_first_tenant). Completing it
+// needs the setup code the core prints to its log at startup, so whoever
+// reaches a fresh install first over the network cannot claim it.
+service SetupService {
+  rpc GetSetupStatus(GetSetupStatusRequest) returns (GetSetupStatusResponse);
+  rpc CompleteSetup(CompleteSetupRequest) returns (CompleteSetupResponse);
+}
+
+message GetSetupStatusRequest {}
+
+message GetSetupStatusResponse {
+  // True until the first organisation and administrator exist. Once false,
+  // the other fields are left empty: anyone may ask.
+  bool needed = 1;
+  // The newest schema migration the database has applied, and the newest
+  // this server ships. Equal means the database is ready.
+  string schema_version = 2;
+  string schema_latest = 3;
+  // The data region this server stores images in; the organisation's
+  // region defaults to it.
+  string region = 4;
+}
+
+message CompleteSetupRequest {
+  string setup_code = 1;
+  // The default tenant's name. Empty means "Default".
+  string organization_name = 2;
+  string admin_email = 3;
+  string admin_name = 4;
+  // Empty means the server's region.
+  string region = 5;
+}
+
+// The administrator is signed in by the same session cookie a verified
+// sign-in code sets.
+message CompleteSetupResponse {
+  Staff staff = 1;
+}

@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+import "assessmatrix/v1/auth.proto";
+import "assessmatrix/v1/exam.proto";
+
+// Tenants, who may work in them, and instruments shared between them.
+//
+// A session belongs to one tenant at a time. A staff member who has access to
+// several switches between them; nothing reads two tenants in one request.
+// Managing access and sharing need the admin role, both in the tenant you are
+// signed in to and in every other tenant the request touches. A super
+// administrator creates tenants and is the only one who makes or changes
+// administrators; an administrator adds users to their tenants as members.
+
+message Tenant {
+  string id = 1;
+  string name = 2;
+  // Where this tenant's personal data and images are kept.
+  string region = 3;
+  // The caller's role there. Unspecified for a tenant a super administrator
+  // manages without working in it.
+  Role role = 4;
+  // The tenant this session is signed in to.
+  bool current = 5;
+}
+
+service TenantService {
+  // The tenants the caller has access to.
+  rpc ListMyTenants(ListMyTenantsRequest) returns (ListMyTenantsResponse);
+  // Ends this session and starts one in another tenant the caller belongs to.
+  rpc SwitchTenant(SwitchTenantRequest) returns (SwitchTenantResponse);
+  // Super administrator. A new tenant and its first administrator.
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
+  // Admin. Everyone with access to any tenant the caller administers; for a
+  // super administrator, every tenant.
+  rpc ListAccess(ListAccessRequest) returns (ListAccessResponse);
+  // Admin of the named tenant, or a super administrator. Grants, changes or
+  // withdraws one person's access. Only a super administrator grants the
+  // admin role or changes an administrator's access.
+  rpc SetAccess(SetAccessRequest) returns (SetAccessResponse);
+  // Admin. Where an instrument has been shared, among the tenants the caller administers.
+  rpc ListExamCopies(ListExamCopiesRequest) returns (ListExamCopiesResponse);
+  // Admin here and in each target. Copies a published version into each
+  // target tenant and publishes it there, creating the copy the first time and
+  // adding a version to it after. Each target succeeds or fails on its own.
+  rpc ShareExam(ShareExamRequest) returns (ShareExamResponse);
+}
+
+message ListMyTenantsRequest {}
+
+message ListMyTenantsResponse {
+  repeated Tenant tenants = 1;
+}
+
+message SwitchTenantRequest {
+  string tenant_id = 1;
+}
+
+message SwitchTenantResponse {
+  Staff staff = 1;
+}
+
+message CreateTenantRequest {
+  string name = 1;
+  // Empty means the region of the tenant the caller is signed in to.
+  string region = 2;
+  // Its first administrator. Empty means the caller.
+  string admin_email = 3;
+  // Used when the administrator is new to the installation.
+  string admin_name = 4;
+}
+
+message CreateTenantResponse {
+  Tenant tenant = 1;
+}
+
+message ListAccessRequest {}
+
+message AccessGrant {
+  string tenant_id = 1;
+  Role role = 2;
+}
+
+message StaffAccess {
+  string email = 1;
+  string name = 2;
+  // Only tenants the caller administers.
+  repeated AccessGrant grants = 3;
+  bool super_admin = 4;
+}
+
+message ListAccessResponse {
+  // The tenants the caller administers (every tenant, for a super
+  // administrator): the columns of the access table.
+  repeated Tenant tenants = 1;
+  repeated StaffAccess staff = 2;
+}
+
+message SetAccessRequest {
+  string email = 1;
+  // Used when the person is new to the tenant; empty keeps an existing name.
+  string name = 2;
+  string tenant_id = 3;
+  // ROLE_UNSPECIFIED withdraws access.
+  Role role = 4;
+}
+
+message SetAccessResponse {
+  StaffAccess staff = 1;
+}
+
+message ListExamCopiesRequest {
+  string exam_id = 1;
+}
+
+message ExamCopy {
+  string tenant_id = 1;
+  string tenant_name = 2;
+  // Empty when the instrument has not been shared there.
+  string exam_id = 3;
+  // The original's version the copy holds.
+  int32 source_version = 4;
+  // The copy's own version that is live there.
+  int32 published_version = 5;
+  Status status = 6;
+}
+
+message ListExamCopiesResponse {
+  // One row per tenant the caller administers, other than this one.
+  repeated ExamCopy copies = 1;
+}
+
+message ShareExamRequest {
+  string exam_id = 1;
+  // A published version. 0 means the one live now.
+  int32 version = 2;
+  repeated string tenant_ids = 3;
+}
+
+message ShareResult {
+  string tenant_id = 1;
+  // Set when the share went through.
+  ExamCopy copy = 2;
+  // Why it did not, in words an administrator can act on.
+  string error = 3;
+}
+
+message ShareExamResponse {
+  repeated ShareResult results = 1;
+}
