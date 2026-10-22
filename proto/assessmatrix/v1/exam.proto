@@ -1,0 +1,218 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+// Instruments: exams, quizzes and questionnaires, with their versions.
+//
+// Shapes mirror apps/studio/src/store.ts so the prototype's screens can switch
+// from localStorage to this service without changing what they render.
+// Times are Unix milliseconds. protobuf-es reads int64 as bigint; the studio
+// converts them to numbers at its edge (apps/studio/src/backend/convert.ts).
+
+// What an instrument is for. The engine is identical; what changes is whether
+// answers have a right one, whether there is a clock, and what "results" means.
+enum Kind {
+  KIND_UNSPECIFIED = 0;
+  KIND_EXAM = 1;
+  KIND_QUIZ = 2;
+  // Ungraded. Called "Questionnaire" in the UI.
+  KIND_SURVEY = 3;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  // Invisible to candidates.
+  STATUS_DRAFT = 1;
+  STATUS_PUBLISHED = 2;
+  // Retired but recoverable. Only an archived instrument can be deleted.
+  STATUS_ARCHIVED = 3;
+}
+
+enum ItemType {
+  ITEM_TYPE_UNSPECIFIED = 0;
+  ITEM_TYPE_SINGLE = 1;
+  ITEM_TYPE_MULTIPLE = 2;
+  ITEM_TYPE_BOOLEAN = 3;
+  ITEM_TYPE_SHORT = 4;
+  // Never auto-scored; reported as pending human review.
+  ITEM_TYPE_ESSAY = 5;
+  ITEM_TYPE_LIKERT = 6;
+  ITEM_TYPE_RATING = 7;
+}
+
+// An image. `url` is an object-storage URL in production; the prototype's
+// data: URLs are accepted until media upload lands (docs/09 Phase 3).
+message Media {
+  string id = 1;
+  string url = 2;
+  // Required for accessibility. Must not give the answer away.
+  string alt = 3;
+  int32 w = 4;
+  int32 h = 5;
+  int64 bytes = 6;
+}
+
+message Choice {
+  string id = 1;
+  string text = 2;
+  Media image = 3;
+}
+
+message Scale {
+  int32 points = 1;
+  string min_label = 2;
+  string max_label = 3;
+}
+
+message Item {
+  string id = 1;
+  ItemType type = 2;
+  string stem = 3;
+  Media image = 4;
+  repeated Choice choices = 5;
+  // The answer key: choice ids, or accepted strings for short answers.
+  // Always empty in anything served to a candidate.
+  repeated string correct = 6;
+  int32 points = 7;
+  string skill = 8;
+  bool allow_answer_image = 9;
+  bool required = 10;
+  Scale scale = 11;
+}
+
+message Section {
+  string id = 1;
+  string name = 2;
+  int32 minutes = 3;
+  repeated Item items = 4;
+}
+
+message Exam {
+  string id = 1;
+  Kind kind = 2;
+  Status status = 3;
+  // The working version being edited. Starts at 1.
+  int32 version = 4;
+  // Which version candidates get. 0 until first published.
+  int32 published_version = 5;
+  string title = 6;
+  string issuer = 7;
+  // Integrity tier, 0 to 3.
+  int32 tier = 8;
+  int32 pass_pct = 9;
+  bool shuffle = 10;
+  bool timed = 11;
+  bool anonymous = 12;
+  repeated Section sections = 13;
+  int64 updated_at = 14;
+  // Set on a copy shared in from another tenant. Read-only: only sharing
+  // again changes it.
+  SharedFrom shared_from = 15;
+}
+
+// The original a shared copy follows, as it was when last shared.
+message SharedFrom {
+  string exam_id = 1;
+  // The original's version this copy was last brought up to.
+  int32 version = 2;
+  string tenant_name = 3;
+}
+
+// A frozen copy. Publishing is what makes one; attempts and invitations are
+// pinned to it, so editing the working copy cannot change a paper being sat.
+message ExamVersion {
+  string exam_id = 1;
+  int32 version = 2;
+  int64 published_at = 3;
+  string note = 4;
+  Exam exam = 5;
+}
+
+service ExamService {
+  rpc ListExams(ListExamsRequest) returns (ListExamsResponse);
+  rpc GetExam(GetExamRequest) returns (GetExamResponse);
+  rpc CreateExam(CreateExamRequest) returns (CreateExamResponse);
+  rpc SaveExam(SaveExamRequest) returns (SaveExamResponse);
+  rpc DuplicateExam(DuplicateExamRequest) returns (DuplicateExamResponse);
+  rpc SetExamStatus(SetExamStatusRequest) returns (SetExamStatusResponse);
+  // Irreversible. Refused unless the instrument is archived.
+  rpc DeleteExam(DeleteExamRequest) returns (DeleteExamResponse);
+  rpc ListExamVersions(ListExamVersionsRequest) returns (ListExamVersionsResponse);
+}
+
+message ListExamsRequest {}
+
+message ListExamsResponse {
+  repeated Exam exams = 1;
+}
+
+message GetExamRequest {
+  string id = 1;
+}
+
+message GetExamResponse {
+  Exam exam = 1;
+}
+
+message CreateExamRequest {
+  Kind kind = 1;
+}
+
+message CreateExamResponse {
+  Exam exam = 1;
+}
+
+enum SaveMode {
+  SAVE_MODE_UNSPECIFIED = 0;
+  // Save the working copy. Never touches a published snapshot.
+  SAVE_MODE_DRAFT = 1;
+  // Overwrite the live version and its frozen copy. People mid-attempt see it.
+  SAVE_MODE_IN_PLACE = 2;
+  // Branch the working copy to version + 1, leaving the live one alone.
+  SAVE_MODE_NEW_VERSION = 3;
+}
+
+message SaveExamRequest {
+  // Status, version and published_version in here are ignored: they change
+  // only through SetExamStatus and SAVE_MODE_NEW_VERSION.
+  Exam exam = 1;
+  SaveMode mode = 2;
+  // The updated_at the editor loaded. A newer stored copy refuses the save
+  // (ABORTED) rather than silently overwriting someone else's edit.
+  int64 expected_updated_at = 3;
+}
+
+message SaveExamResponse {
+  Exam exam = 1;
+}
+
+message DuplicateExamRequest {
+  string id = 1;
+}
+
+message DuplicateExamResponse {
+  Exam exam = 1;
+}
+
+message SetExamStatusRequest {
+  string id = 1;
+  Status status = 2;
+}
+
+message SetExamStatusResponse {
+  Exam exam = 1;
+}
+
+message DeleteExamRequest {
+  string id = 1;
+}
+
+message DeleteExamResponse {}
+
+message ListExamVersionsRequest {
+  string exam_id = 1;
+}
+
+message ListExamVersionsResponse {
+  repeated ExamVersion versions = 1;
+}

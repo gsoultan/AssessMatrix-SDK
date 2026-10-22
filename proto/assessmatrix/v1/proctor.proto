@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+import "assessmatrix/v1/assignment.proto";
+import "assessmatrix/v1/result.proto";
+
+// Live monitoring of an exam's sittings, for staff. One server stream per
+// watcher; each message is the whole picture, sent when something changed.
+service ProctorService {
+  rpc WatchExam(WatchExamRequest) returns (stream WatchExamResponse);
+}
+
+message WatchExamRequest {
+  string exam_id = 1;
+}
+
+message WatchExamResponse {
+  int64 server_now = 1;
+  repeated Sitting sittings = 2;
+}
+
+// One person's sitting of the exam: invited, in progress or handed in.
+message Sitting {
+  string assignment_id = 1;
+  string person_name = 2;
+  AssignStatus status = 3;
+  // Empty until they start.
+  string attempt_id = 4;
+  int32 answered = 5;
+  int32 total = 6;
+  int64 started_at = 7;
+  int64 submitted_at = 8;
+  // When the server last heard from their device.
+  int64 last_seen_at = 9;
+  int32 score_pct = 10;
+  repeated Flag flags = 11;
+}

@@ -1,0 +1,268 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+import "assessmatrix/v1/exam.proto";
+
+// Everything a candidate does, from opening an emailed link to submitting.
+//
+// The link token travels in the request body, never in a URL the server
+// logs. Verifying the emailed code sets an HttpOnly, Secure, SameSite=Strict
+// session cookie bound to one invitation; every call after that is
+// authenticated by that cookie alone.
+
+// Why a link was refused. Everything short of UNKNOWN is told only to
+// someone holding a token we issued.
+enum Refusal {
+  REFUSAL_UNSPECIFIED = 0;
+  // Not a link we issued. Says nothing else, on purpose.
+  REFUSAL_UNKNOWN = 1;
+  REFUSAL_REVOKED = 2;
+  REFUSAL_EXPIRED = 3;
+  REFUSAL_LOCKED = 4;
+  // Already redeemed. The holder may ask for a new link.
+  REFUSAL_USED = 5;
+  // Replaced by a newer link. The holder may ask for another.
+  REFUSAL_SUPERSEDED = 6;
+  REFUSAL_SUBMITTED = 7;
+  // The instrument is unpublished or archived.
+  REFUSAL_CLOSED = 8;
+  // Asked again too soon; see retry_at.
+  REFUSAL_COOLDOWN = 9;
+  // No more self-service links for this invitation.
+  REFUSAL_LIMIT = 10;
+  REFUSAL_WRONG_CODE = 11;
+  // The code expired or ran out of tries; ask for a new one.
+  REFUSAL_STALE_CODE = 12;
+}
+
+// What the invitation screen shows before anything is collected.
+message InvitationSummary {
+  string exam_title = 1;
+  string issuer = 2;
+  Kind kind = 3;
+  int32 tier = 4;
+  int32 minutes = 5;
+  int32 pass_pct = 6;
+  int32 item_count = 7;
+  // b•••@example.id. A forwarded link must not hand over the inbox.
+  string masked_email = 8;
+  int64 expires_at = 9;
+}
+
+service CandidateService {
+  rpc OpenLink(OpenLinkRequest) returns (OpenLinkResponse);
+  rpc RequestCode(RequestCodeRequest) returns (RequestCodeResponse);
+  // Right code: spends the link and starts the session in one transaction.
+  rpc VerifyCode(VerifyCodeRequest) returns (VerifyCodeResponse);
+  // Mails a new link to the address on file. Never extends the deadline.
+  rpc RequestNewLink(RequestNewLinkRequest) returns (RequestNewLinkResponse);
+
+  // The rest need the session cookie.
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc StartAttempt(StartAttemptRequest) returns (StartAttemptResponse);
+  // Batched, idempotent by batch_id: a retried batch is acknowledged, not
+  // appended twice.
+  rpc AppendEvents(AppendEventsRequest) returns (AppendEventsResponse);
+  rpc SubmitAttempt(SubmitAttemptRequest) returns (SubmitAttemptResponse);
+  rpc EndSession(EndSessionRequest) returns (EndSessionResponse);
+  // Everything recorded about the candidate's attempt: every event, the
+  // check of its seal and, once handed in, the reason for each flag. Their
+  // own copy of their record, to read or download (UU PDP No. 27/2022).
+  rpc GetRecord(GetRecordRequest) returns (GetRecordResponse);
+}
+
+message OpenLinkRequest {
+  string token = 1;
+}
+
+message OpenLinkResponse {
+  bool ok = 1;
+  Refusal refusal = 2;
+  InvitationSummary invitation = 3;
+  // Set on refusals other than UNKNOWN, so the page can say where mail went.
+  string masked_email = 4;
+}
+
+message RequestCodeRequest {
+  string token = 1;
+}
+
+message RequestCodeResponse {
+  bool ok = 1;
+  Refusal refusal = 2;
+  int64 retry_at = 3;
+  // Codes left for this link after this one.
+  int32 left = 4;
+}
+
+message VerifyCodeRequest {
+  string token = 1;
+  string code = 2;
+}
+
+message VerifyCodeResponse {
+  bool ok = 1;
+  Refusal refusal = 2;
+  int32 tries_left = 3;
+}
+
+message RequestNewLinkRequest {
+  string token = 1;
+}
+
+message RequestNewLinkResponse {
+  bool ok = 1;
+  Refusal refusal = 2;
+  int64 retry_at = 3;
+}
+
+// One answer, as the candidate left it.
+message ItemAnswer {
+  repeated string values = 1;
+  string text = 2;
+  Media file = 3;
+}
+
+// A thing that happened in an attempt. The client proposes kind and content;
+// the server assigns seq and server_time and chains each event's hash to the
+// previous one, so the log is tamper-evident.
+//
+// Kinds that change answers: response.changed (values), response.typed
+// (text), answer.attached / answer.detached (file), item.flagged,
+// item.unflagged. Anything else (focus.lost, paste, ...) is evidence only.
+// consent.<purpose>.withdrawn is the candidate taking back a consent during
+// the attempt (turning the camera off); nothing is collected under that
+// purpose after it.
+message AttemptEvent {
+  int64 seq = 1;
+  int64 server_time = 2;
+  int64 client_time = 3;
+  string kind = 4;
+  string item_id = 5;
+  repeated string values = 6;
+  string text = 7;
+  Media file = 8;
+  string detail = 9;
+}
+
+message Score {
+  int32 raw = 1;
+  int32 max = 2;
+  int32 pct = 3;
+  bool passed = 4;
+  // Essay points awaiting a person, left out of raw, max and pct until
+  // reviewed. Scales are not scored.
+  int32 pending_human = 5;
+}
+
+message Attempt {
+  string id = 1;
+  string assignment_id = 2;
+  string exam_id = 3;
+  int32 exam_version = 4;
+  int64 started_at = 5;
+  // Server time is authoritative; the device clock never ends an exam.
+  // 0 when the instrument is untimed.
+  int64 deadline_at = 6;
+  int64 submitted_at = 7;
+  // Folded from the event log.
+  map<string, ItemAnswer> answers = 8;
+  repeated string flagged = 9;
+  Score score = 10;
+  // The highest seq the server holds.
+  int64 last_seq = 11;
+  repeated AttemptEvent events = 12;
+  // When the record (answers and signals) was deleted at the end of its
+  // retention period; 0 while it is held.
+  int64 purged_at = 13;
+  // Served to the candidate once they hand in: the reason for each integrity
+  // flag on their attempt, in Indonesian, so they can see and contest it.
+  repeated string flag_reasons = 14;
+  // Served to the candidate once they hand in: what a person gave each
+  // answer they scored, with the reviewer's note.
+  repeated ItemReview reviews = 15;
+  // Purposes the candidate withdrew consent for during the attempt
+  // ("camera"), so a resumed runner does not start collecting them again.
+  repeated string withdrawn = 16;
+}
+
+message ItemReview {
+  string item_id = 1;
+  int32 points = 2;
+  int32 max_points = 3;
+  string note = 4;
+}
+
+message GetSessionRequest {}
+
+message GetSessionResponse {
+  string assignment_id = 1;
+  InvitationSummary invitation = 2;
+  // The pinned version, with every answer key removed.
+  Exam exam = 3;
+  // The attempt so far, if one was started.
+  Attempt attempt = 4;
+  int64 server_now = 5;
+  // Where the credential this attempt earned can be checked, once it has one.
+  string credential_url = 6;
+}
+
+message StartAttemptRequest {
+  // The purposes the candidate agreed to on the consent screen, each
+  // separately. The tier's required purposes must all be here; the server
+  // records each as a consent event, and refuses any signal collected under
+  // a purpose that is missing.
+  repeated string consents = 1;
+}
+
+message StartAttemptResponse {
+  Attempt attempt = 1;
+  int64 server_now = 2;
+}
+
+message AppendEventsRequest {
+  string attempt_id = 1;
+  // Client-generated, unique per batch. The idempotency key.
+  string batch_id = 2;
+  // At most 500 per batch.
+  repeated AttemptEvent events = 3;
+}
+
+message AppendEventsResponse {
+  int64 last_seq = 1;
+  int64 server_now = 2;
+  int64 deadline_at = 3;
+}
+
+message SubmitAttemptRequest {
+  string attempt_id = 1;
+  // Submit is refused while required questions are blank, unless forced
+  // (the clock ran out).
+  bool force = 2;
+}
+
+message SubmitAttemptResponse {
+  bool ok = 1;
+  // Required items still blank, when refused.
+  repeated string missing_item_ids = 2;
+  Attempt attempt = 3;
+  // Where the Open Badges credential this attempt earned can be checked;
+  // empty when it earned none (yet: an essay may still be waiting).
+  string credential_url = 4;
+}
+
+message EndSessionRequest {}
+
+message EndSessionResponse {}
+
+message GetRecordRequest {}
+
+message GetRecordResponse {
+  // With every event. Who scored an essay is left out: the score and the
+  // note are the candidate's; the reviewer's identity is not.
+  Attempt attempt = 1;
+  // False if any stored event no longer matches its seal.
+  bool chain_intact = 2;
+  int64 broken_at_seq = 3;
+}

@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+// Delivery: one person, one instrument, one link, one lifecycle.
+// docs/08-invite-links.md is the specification for everything here.
+//
+// Nothing in these messages can reproduce a working link or code: the server
+// keeps only keyed hashes, and those never leave it.
+
+enum AssignStatus {
+  ASSIGN_STATUS_UNSPECIFIED = 0;
+  ASSIGN_STATUS_INVITED = 1;
+  ASSIGN_STATUS_STARTED = 2;
+  ASSIGN_STATUS_SUBMITTED = 3;
+  ASSIGN_STATUS_EXPIRED = 4;
+}
+
+// What the link is right now, in order of precedence.
+enum LinkState {
+  LINK_STATE_UNSPECIFIED = 0;
+  LINK_STATE_UNSENT = 1;
+  LINK_STATE_LIVE = 2;
+  // Redeemed: the emailed code was verified and a session started.
+  LINK_STATE_USED = 3;
+  LINK_STATE_EXPIRED = 4;
+  // Out of codes.
+  LINK_STATE_LOCKED = 5;
+  LINK_STATE_REVOKED = 6;
+}
+
+// Append-only. Repeats of the same event fold into `count`, so a link opened
+// a thousand times cannot grow the log.
+message InviteEvent {
+  int32 seq = 1;
+  int64 at = 2;
+  string kind = 3;
+  string detail = 4;
+  int32 count = 5;
+}
+
+message Assignment {
+  string id = 1;
+  string exam_id = 2;
+  // The version this invitation opens. Pinned when assigned.
+  int32 exam_version = 3;
+  string person_id = 4;
+  int64 assigned_at = 5;
+  // 0 when there is no due date.
+  int64 due_at = 6;
+  AssignStatus status = 7;
+  int64 started_at = 8;
+  int64 submitted_at = 9;
+  // Set once a scored attempt is submitted.
+  optional int32 score_pct = 10;
+  optional bool passed = 11;
+  int64 sent_at = 12;
+  int64 expires_at = 13;
+  int64 redeemed_at = 14;
+  int64 revoked_at = 15;
+  LinkState link_state = 16;
+  int32 otp_sends = 17;
+  int32 self_serves = 18;
+  repeated InviteEvent history = 19;
+  // 1 for a person's first sitting of this instrument, 2 for the next, and so on.
+  int32 sitting = 20;
+}
+
+service AssignmentService {
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse);
+  // One assignment per person per instrument; re-assigning is a no-op.
+  // Invitations go out at once for a published instrument and are held for
+  // a draft.
+  rpc AssignPeople(AssignPeopleRequest) returns (AssignPeopleResponse);
+  rpc Unassign(UnassignRequest) returns (UnassignResponse);
+  // Mint and mail a new link for each, retiring the old link and its session.
+  rpc SendInvites(SendInvitesRequest) returns (SendInvitesResponse);
+  // Kill the link and any session it started. The row and its history stay.
+  rpc RevokeInvite(RevokeInviteRequest) returns (RevokeInviteResponse);
+}
+
+message ListAssignmentsRequest {
+  // Empty lists every assignment in the tenant.
+  string exam_id = 1;
+}
+
+message ListAssignmentsResponse {
+  repeated Assignment assignments = 1;
+}
+
+message AssignPeopleRequest {
+  string exam_id = 1;
+  repeated string person_ids = 2;
+  // 0 for no due date.
+  int64 due_at = 3;
+  // The published version to sit; 0 for the live one (the working one for a draft).
+  int32 exam_version = 4;
+}
+
+message AssignPeopleResponse {
+  // Only the ones that were new.
+  repeated Assignment assignments = 1;
+  // How many invitations were mailed. 0 for a draft.
+  int32 sent = 2;
+}
+
+message UnassignRequest {
+  string id = 1;
+}
+
+message UnassignResponse {}
+
+message SendInvitesRequest {
+  repeated string assignment_ids = 1;
+}
+
+message SendInvitesResponse {
+  int32 sent = 1;
+}
+
+message RevokeInviteRequest {
+  string assignment_id = 1;
+}
+
+message RevokeInviteResponse {
+  Assignment assignment = 1;
+}

@@ -1,0 +1,181 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+import "assessmatrix/v1/candidate.proto";
+import "assessmatrix/v1/exam.proto";
+
+// Submitted attempts, for the Responses screen and score reports.
+
+message Response {
+  string attempt_id = 1;
+  string assignment_id = 2;
+  // Empty for an anonymous questionnaire.
+  string person_id = 3;
+  int32 exam_version = 4;
+  int64 submitted_at = 5;
+  map<string, ItemAnswer> answers = 6;
+  Score score = 7;
+}
+
+service ResultService {
+  rpc ListResponses(ListResponsesRequest) returns (ListResponsesResponse);
+  // The full, hash-chained event log of one attempt, with a check of the chain.
+  rpc GetAttemptLog(GetAttemptLogRequest) returns (GetAttemptLogResponse);
+  // Essays waiting for a person, blind: the reviewer sees "Answer 7 to
+  // question 3", not a name, an attempt or a hand-in time.
+  rpc ListReviews(ListReviewsRequest) returns (ListReviewsResponse);
+  // A person's score for one essay. Written to the attempt's log; the
+  // attempt's score and its assignment's are recomputed from it.
+  rpc ScoreAnswer(ScoreAnswerRequest) returns (ScoreAnswerResponse);
+  // Classical test theory statistics for one version of an exam, computed
+  // by the psychometrics worker outside any request.
+  rpc GetItemAnalysis(GetItemAnalysisRequest) returns (GetItemAnalysisResponse);
+}
+
+message ListResponsesRequest {
+  string exam_id = 1;
+}
+
+message ListResponsesResponse {
+  repeated Response responses = 1;
+}
+
+message GetAttemptLogRequest {
+  string attempt_id = 1;
+}
+
+message GetAttemptLogResponse {
+  repeated AttemptEvent events = 1;
+  // False if any stored event no longer matches its hash chain.
+  bool chain_intact = 2;
+  // The first seq at which the chain breaks, when it does.
+  int64 broken_at_seq = 3;
+  // What the integrity rules found in this log.
+  repeated Flag flags = 4;
+  // When the record was deleted at the end of its retention period; 0 if
+  // it is still held. A deleted record keeps its score, not its events.
+  int64 purged_at = 5;
+}
+
+// One reason a reviewer should look at an attempt, derived deterministically
+// from its event log. The reason states what was observed, so the candidate
+// can check and contest it.
+message Flag {
+  // record_altered, focus_away, paste, rapid_answers, device_changed,
+  // second_tab, fullscreen_exit, face_missing, multiple_faces, camera_stopped.
+  string type = 1;
+  // info, review or serious.
+  string severity = 2;
+  // For staff, in English.
+  string reason = 3;
+  // The same, for the candidate, in Indonesian.
+  string reason_id = 4;
+  // The question it concerns, when it concerns one.
+  string item_id = 5;
+}
+
+message ListReviewsRequest {
+  string exam_id = 1;
+  // Also list essays already scored, to look again.
+  bool include_done = 2;
+}
+
+message ReviewTask {
+  // Not set: the attempt would lead back to the candidate. See task.
+  string attempt_id = 1 [deprecated = true];
+  // "Answer 7": numbered per question in an order derived from a server
+  // secret, not hand-in order, so answers to different questions by the
+  // same candidate cannot be linked, nor any answer matched to a hand-in.
+  string label = 2;
+  string item_id = 3;
+  // The question's position as the candidate saw it.
+  int32 number = 4;
+  string stem = 5;
+  string text = 6;
+  Media file = 7;
+  // Most the essay can earn.
+  int32 points = 8;
+  bool reviewed = 9;
+  // The score and note, when the caller gave them. Another reviewer's are
+  // not shown, so a second look is independent of the first.
+  int32 given = 10;
+  string note = 11;
+  // Not set, for the same reason as attempt_id.
+  int64 submitted_at = 12 [deprecated = true];
+  // Opaque, sealed under the server secret: what ScoreAnswer takes to score
+  // this answer.
+  string task = 13;
+  // Scored by a reviewer other than the caller.
+  bool scored_by_other = 14;
+}
+
+message ListReviewsResponse {
+  repeated ReviewTask tasks = 1;
+}
+
+message ScoreAnswerRequest {
+  // Either task, from the review queue, or attempt_id and item_id.
+  string attempt_id = 1;
+  string item_id = 2;
+  int32 points = 3;
+  // Shown to the candidate with the score.
+  string note = 4;
+  string task = 5;
+}
+
+message ScoreAnswerResponse {
+  Score score = 1;
+  // Set when this review completed a passing result and issued (or
+  // restored) the candidate's credential.
+  string credential_url = 2;
+}
+
+message GetItemAnalysisRequest {
+  string exam_id = 1;
+  // 0: the newest version with an analysis.
+  int32 exam_version = 2;
+}
+
+// What the worker found. Its JSON form is what the worker writes.
+message GetItemAnalysisResponse {
+  int32 exam_version = 1;
+  // Submitted attempts the statistics are over.
+  int32 n = 2;
+  int64 computed_at = 3;
+  repeated ItemStat items = 4;
+  // KR-20 reliability of the machine-scored part; meaningful only with
+  // enough attempts (see too_few).
+  double kr20 = 5;
+  // Fewer attempts than the worker needs for stable numbers: shown, but
+  // labelled provisional.
+  bool too_few = 6;
+  // Waiting for the worker (nothing computed yet for this version).
+  bool pending = 7;
+}
+
+message ItemStat {
+  string item_id = 1;
+  int32 number = 2;
+  int32 n = 3;
+  // Share of full marks: difficulty, higher is easier.
+  double p_value = 4;
+  // Corrected item-total correlation: does doing well here go with doing
+  // well on the rest? Below 0.2 deserves a look; negative, a key check.
+  double point_biserial = 5;
+  repeated ChoiceStat choices = 6;
+  // Plain-language reading of the numbers, for authors.
+  repeated string notes = 7;
+  // Everyone scored the same, so point_biserial is undefined (sent as 0).
+  bool no_spread = 8;
+}
+
+message ChoiceStat {
+  string choice_id = 1;
+  bool correct = 2;
+  // Share of all candidates who picked it.
+  double share = 3;
+  // Share within the top and bottom 27% by total score.
+  double share_upper = 4;
+  double share_lower = 5;
+}

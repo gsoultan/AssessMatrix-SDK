@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+// Outbound webhooks: an organisation's own systems hear about lifecycle
+// changes as they happen. docs/05-integration.md §4 is the contract.
+//
+// Every event is written in the same transaction as the change that caused
+// it, so a change that rolls back sends nothing and one that commits is
+// delivered at least once. Each request is signed with the endpoint's secret:
+//
+//   AssessMatrix-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, t + "." + body)>
+//
+// and carries the event id as AssessMatrix-Event-Id, the same on every retry
+// and redelivery, so a receiver can de-duplicate. Payloads name records by id
+// only: no names, emails or answers leave in a webhook.
+
+message WebhookEndpoint {
+  string id = 1;
+  // https only, and never a private, loopback or link-local address.
+  string url = 2;
+  string description = 3;
+  // Event types this endpoint receives; see WebhookEventTypes.
+  repeated string events = 4;
+  // A paused endpoint receives nothing; events meanwhile are not queued.
+  bool active = 5;
+  int64 created_at = 6;
+  // The secret's first characters, to tell which one a receiver holds.
+  string secret_hint = 7;
+  // Delivery health over the log the server keeps (30 days).
+  int32 delivered = 8;
+  int32 failing = 9;
+  int64 last_delivery_at = 10;
+}
+
+enum DeliveryState {
+  DELIVERY_STATE_UNSPECIFIED = 0;
+  // Queued, or failed and waiting for its next try.
+  DELIVERY_STATE_PENDING = 1;
+  DELIVERY_STATE_DELIVERED = 2;
+  // Out of tries. Redeliver sends it again.
+  DELIVERY_STATE_FAILED = 3;
+}
+
+message WebhookDelivery {
+  string id = 1;
+  string endpoint_id = 2;
+  string event_id = 3;
+  string event_type = 4;
+  DeliveryState state = 5;
+  int32 tries = 6;
+  // The receiver's HTTP status on the last try; 0 if it never answered.
+  int32 last_status = 7;
+  // Why the last try failed, in words. Never the receiver's response body.
+  string last_error = 8;
+  int64 created_at = 9;
+  int64 last_try_at = 10;
+  int64 delivered_at = 11;
+  // The exact body that is signed and sent.
+  string payload = 12;
+}
+
+service WebhookService {
+  rpc ListWebhooks(ListWebhooksRequest) returns (ListWebhooksResponse);
+  // The secret is returned here and on rotation only; it is stored sealed.
+  rpc CreateWebhook(CreateWebhookRequest) returns (CreateWebhookResponse);
+  rpc UpdateWebhook(UpdateWebhookRequest) returns (UpdateWebhookResponse);
+  rpc RotateWebhookSecret(RotateWebhookSecretRequest) returns (RotateWebhookSecretResponse);
+  // Pending deliveries to it are dropped with it.
+  rpc DeleteWebhook(DeleteWebhookRequest) returns (DeleteWebhookResponse);
+  rpc ListDeliveries(ListDeliveriesRequest) returns (ListDeliveriesResponse);
+  // Sends a delivery again with its original event id and payload.
+  rpc Redeliver(RedeliverRequest) returns (RedeliverResponse);
+  // Queues a webhook.ping to one endpoint, to check the receiver end to end.
+  rpc PingWebhook(PingWebhookRequest) returns (PingWebhookResponse);
+}
+
+message ListWebhooksRequest {}
+
+message ListWebhooksResponse {
+  repeated WebhookEndpoint endpoints = 1;
+  // Every event type an endpoint can subscribe to.
+  repeated string event_types = 2;
+}
+
+message CreateWebhookRequest {
+  string url = 1;
+  string description = 2;
+  repeated string events = 3;
+}
+
+message CreateWebhookResponse {
+  WebhookEndpoint endpoint = 1;
+  string secret = 2;
+}
+
+message UpdateWebhookRequest {
+  string id = 1;
+  string url = 2;
+  string description = 3;
+  repeated string events = 4;
+  bool active = 5;
+}
+
+message UpdateWebhookResponse {
+  WebhookEndpoint endpoint = 1;
+}
+
+message RotateWebhookSecretRequest {
+  string id = 1;
+}
+
+message RotateWebhookSecretResponse {
+  WebhookEndpoint endpoint = 1;
+  string secret = 2;
+}
+
+message DeleteWebhookRequest {
+  string id = 1;
+}
+
+message DeleteWebhookResponse {}
+
+message ListDeliveriesRequest {
+  // Empty for every endpoint.
+  string endpoint_id = 1;
+  // Only deliveries that are out of tries.
+  bool failed_only = 2;
+  // Newest first, at most 200 (default 50).
+  int32 limit = 3;
+}
+
+message ListDeliveriesResponse {
+  repeated WebhookDelivery deliveries = 1;
+}
+
+message RedeliverRequest {
+  string delivery_id = 1;
+}
+
+message RedeliverResponse {
+  WebhookDelivery delivery = 1;
+}
+
+message PingWebhookRequest {
+  string id = 1;
+}
+
+message PingWebhookResponse {
+  WebhookDelivery delivery = 1;
+}
