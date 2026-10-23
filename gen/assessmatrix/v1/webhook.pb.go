@@ -1111,6 +1111,131 @@ func (x *PingWebhookResponse) GetDelivery() *WebhookDelivery {
 	return nil
 }
 
+type ReplayEventsRequest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	EndpointId string                 `protobuf:"bytes,1,opt,name=endpoint_id,json=endpointId,proto3" json:"endpoint_id,omitempty"`
+	// One attempt's events. Or leave it empty and give a window.
+	AttemptId string `protobuf:"bytes,2,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	// The window, unix milliseconds, from inclusive and to exclusive. Within
+	// the 30 days the log is kept.
+	From          int64 `protobuf:"varint,3,opt,name=from,proto3" json:"from,omitempty"`
+	To            int64 `protobuf:"varint,4,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplayEventsRequest) Reset() {
+	*x = ReplayEventsRequest{}
+	mi := &file_assessmatrix_v1_webhook_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayEventsRequest) ProtoMessage() {}
+
+func (x *ReplayEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_webhook_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayEventsRequest.ProtoReflect.Descriptor instead.
+func (*ReplayEventsRequest) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_webhook_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ReplayEventsRequest) GetEndpointId() string {
+	if x != nil {
+		return x.EndpointId
+	}
+	return ""
+}
+
+func (x *ReplayEventsRequest) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
+}
+
+func (x *ReplayEventsRequest) GetFrom() int64 {
+	if x != nil {
+		return x.From
+	}
+	return 0
+}
+
+func (x *ReplayEventsRequest) GetTo() int64 {
+	if x != nil {
+		return x.To
+	}
+	return 0
+}
+
+type ReplayEventsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Events queued to send again.
+	Queued int32 `protobuf:"varint,1,opt,name=queued,proto3" json:"queued,omitempty"`
+	// Events already waiting to be sent, left as they are.
+	AlreadyPending int32 `protobuf:"varint,2,opt,name=already_pending,json=alreadyPending,proto3" json:"already_pending,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ReplayEventsResponse) Reset() {
+	*x = ReplayEventsResponse{}
+	mi := &file_assessmatrix_v1_webhook_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplayEventsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplayEventsResponse) ProtoMessage() {}
+
+func (x *ReplayEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_webhook_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplayEventsResponse.ProtoReflect.Descriptor instead.
+func (*ReplayEventsResponse) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_webhook_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ReplayEventsResponse) GetQueued() int32 {
+	if x != nil {
+		return x.Queued
+	}
+	return 0
+}
+
+func (x *ReplayEventsResponse) GetAlreadyPending() int32 {
+	if x != nil {
+		return x.AlreadyPending
+	}
+	return 0
+}
+
 var File_assessmatrix_v1_webhook_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_webhook_proto_rawDesc = "" +
@@ -1195,12 +1320,22 @@ const file_assessmatrix_v1_webhook_proto_rawDesc = "" +
 	"\x12PingWebhookRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"S\n" +
 	"\x13PingWebhookResponse\x12<\n" +
-	"\bdelivery\x18\x01 \x01(\v2 .assessmatrix.v1.WebhookDeliveryR\bdelivery*\x84\x01\n" +
+	"\bdelivery\x18\x01 \x01(\v2 .assessmatrix.v1.WebhookDeliveryR\bdelivery\"y\n" +
+	"\x13ReplayEventsRequest\x12\x1f\n" +
+	"\vendpoint_id\x18\x01 \x01(\tR\n" +
+	"endpointId\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\x02 \x01(\tR\tattemptId\x12\x12\n" +
+	"\x04from\x18\x03 \x01(\x03R\x04from\x12\x0e\n" +
+	"\x02to\x18\x04 \x01(\x03R\x02to\"W\n" +
+	"\x14ReplayEventsResponse\x12\x16\n" +
+	"\x06queued\x18\x01 \x01(\x05R\x06queued\x12'\n" +
+	"\x0falready_pending\x18\x02 \x01(\x05R\x0ealreadyPending*\x84\x01\n" +
 	"\rDeliveryState\x12\x1e\n" +
 	"\x1aDELIVERY_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16DELIVERY_STATE_PENDING\x10\x01\x12\x1c\n" +
 	"\x18DELIVERY_STATE_DELIVERED\x10\x02\x12\x19\n" +
-	"\x15DELIVERY_STATE_FAILED\x10\x032\x90\x06\n" +
+	"\x15DELIVERY_STATE_FAILED\x10\x032\xed\x06\n" +
 	"\x0eWebhookService\x12[\n" +
 	"\fListWebhooks\x12$.assessmatrix.v1.ListWebhooksRequest\x1a%.assessmatrix.v1.ListWebhooksResponse\x12^\n" +
 	"\rCreateWebhook\x12%.assessmatrix.v1.CreateWebhookRequest\x1a&.assessmatrix.v1.CreateWebhookResponse\x12^\n" +
@@ -1209,7 +1344,8 @@ const file_assessmatrix_v1_webhook_proto_rawDesc = "" +
 	"\rDeleteWebhook\x12%.assessmatrix.v1.DeleteWebhookRequest\x1a&.assessmatrix.v1.DeleteWebhookResponse\x12a\n" +
 	"\x0eListDeliveries\x12&.assessmatrix.v1.ListDeliveriesRequest\x1a'.assessmatrix.v1.ListDeliveriesResponse\x12R\n" +
 	"\tRedeliver\x12!.assessmatrix.v1.RedeliverRequest\x1a\".assessmatrix.v1.RedeliverResponse\x12X\n" +
-	"\vPingWebhook\x12#.assessmatrix.v1.PingWebhookRequest\x1a$.assessmatrix.v1.PingWebhookResponseB\xc9\x01\n" +
+	"\vPingWebhook\x12#.assessmatrix.v1.PingWebhookRequest\x1a$.assessmatrix.v1.PingWebhookResponse\x12[\n" +
+	"\fReplayEvents\x12$.assessmatrix.v1.ReplayEventsRequest\x1a%.assessmatrix.v1.ReplayEventsResponseB\xc9\x01\n" +
 	"\x13com.assessmatrix.v1B\fWebhookProtoP\x01ZGgithub.com/gsoultan/assessmatrix-sdk/gen/assessmatrix/v1;assessmatrixv1\xa2\x02\x03AXX\xaa\x02\x0fAssessmatrix.V1\xca\x02\x0fAssessmatrix\\V1\xe2\x02\x1bAssessmatrix\\V1\\GPBMetadata\xea\x02\x10Assessmatrix::V1b\x06proto3"
 
 var (
@@ -1225,7 +1361,7 @@ func file_assessmatrix_v1_webhook_proto_rawDescGZIP() []byte {
 }
 
 var file_assessmatrix_v1_webhook_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_assessmatrix_v1_webhook_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_assessmatrix_v1_webhook_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_assessmatrix_v1_webhook_proto_goTypes = []any{
 	(DeliveryState)(0),                  // 0: assessmatrix.v1.DeliveryState
 	(*WebhookEndpoint)(nil),             // 1: assessmatrix.v1.WebhookEndpoint
@@ -1246,6 +1382,8 @@ var file_assessmatrix_v1_webhook_proto_goTypes = []any{
 	(*RedeliverResponse)(nil),           // 16: assessmatrix.v1.RedeliverResponse
 	(*PingWebhookRequest)(nil),          // 17: assessmatrix.v1.PingWebhookRequest
 	(*PingWebhookResponse)(nil),         // 18: assessmatrix.v1.PingWebhookResponse
+	(*ReplayEventsRequest)(nil),         // 19: assessmatrix.v1.ReplayEventsRequest
+	(*ReplayEventsResponse)(nil),        // 20: assessmatrix.v1.ReplayEventsResponse
 }
 var file_assessmatrix_v1_webhook_proto_depIdxs = []int32{
 	0,  // 0: assessmatrix.v1.WebhookDelivery.state:type_name -> assessmatrix.v1.DeliveryState
@@ -1264,16 +1402,18 @@ var file_assessmatrix_v1_webhook_proto_depIdxs = []int32{
 	13, // 13: assessmatrix.v1.WebhookService.ListDeliveries:input_type -> assessmatrix.v1.ListDeliveriesRequest
 	15, // 14: assessmatrix.v1.WebhookService.Redeliver:input_type -> assessmatrix.v1.RedeliverRequest
 	17, // 15: assessmatrix.v1.WebhookService.PingWebhook:input_type -> assessmatrix.v1.PingWebhookRequest
-	4,  // 16: assessmatrix.v1.WebhookService.ListWebhooks:output_type -> assessmatrix.v1.ListWebhooksResponse
-	6,  // 17: assessmatrix.v1.WebhookService.CreateWebhook:output_type -> assessmatrix.v1.CreateWebhookResponse
-	8,  // 18: assessmatrix.v1.WebhookService.UpdateWebhook:output_type -> assessmatrix.v1.UpdateWebhookResponse
-	10, // 19: assessmatrix.v1.WebhookService.RotateWebhookSecret:output_type -> assessmatrix.v1.RotateWebhookSecretResponse
-	12, // 20: assessmatrix.v1.WebhookService.DeleteWebhook:output_type -> assessmatrix.v1.DeleteWebhookResponse
-	14, // 21: assessmatrix.v1.WebhookService.ListDeliveries:output_type -> assessmatrix.v1.ListDeliveriesResponse
-	16, // 22: assessmatrix.v1.WebhookService.Redeliver:output_type -> assessmatrix.v1.RedeliverResponse
-	18, // 23: assessmatrix.v1.WebhookService.PingWebhook:output_type -> assessmatrix.v1.PingWebhookResponse
-	16, // [16:24] is the sub-list for method output_type
-	8,  // [8:16] is the sub-list for method input_type
+	19, // 16: assessmatrix.v1.WebhookService.ReplayEvents:input_type -> assessmatrix.v1.ReplayEventsRequest
+	4,  // 17: assessmatrix.v1.WebhookService.ListWebhooks:output_type -> assessmatrix.v1.ListWebhooksResponse
+	6,  // 18: assessmatrix.v1.WebhookService.CreateWebhook:output_type -> assessmatrix.v1.CreateWebhookResponse
+	8,  // 19: assessmatrix.v1.WebhookService.UpdateWebhook:output_type -> assessmatrix.v1.UpdateWebhookResponse
+	10, // 20: assessmatrix.v1.WebhookService.RotateWebhookSecret:output_type -> assessmatrix.v1.RotateWebhookSecretResponse
+	12, // 21: assessmatrix.v1.WebhookService.DeleteWebhook:output_type -> assessmatrix.v1.DeleteWebhookResponse
+	14, // 22: assessmatrix.v1.WebhookService.ListDeliveries:output_type -> assessmatrix.v1.ListDeliveriesResponse
+	16, // 23: assessmatrix.v1.WebhookService.Redeliver:output_type -> assessmatrix.v1.RedeliverResponse
+	18, // 24: assessmatrix.v1.WebhookService.PingWebhook:output_type -> assessmatrix.v1.PingWebhookResponse
+	20, // 25: assessmatrix.v1.WebhookService.ReplayEvents:output_type -> assessmatrix.v1.ReplayEventsResponse
+	17, // [17:26] is the sub-list for method output_type
+	8,  // [8:17] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -1290,7 +1430,7 @@ func file_assessmatrix_v1_webhook_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_webhook_proto_rawDesc), len(file_assessmatrix_v1_webhook_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

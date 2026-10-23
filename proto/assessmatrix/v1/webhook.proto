@@ -73,6 +73,10 @@ service WebhookService {
   rpc Redeliver(RedeliverRequest) returns (RedeliverResponse);
   // Queues a webhook.ping to one endpoint, to check the receiver end to end.
   rpc PingWebhook(PingWebhookRequest) returns (PingWebhookResponse);
+  // Sends one endpoint every logged event about one attempt, or from a time
+  // window, again: for a receiver that was down or lost data. Each keeps its
+  // original id and body. Only types the endpoint subscribes to are sent.
+  rpc ReplayEvents(ReplayEventsRequest) returns (ReplayEventsResponse);
 }
 
 message ListWebhooksRequest {}
@@ -148,4 +152,21 @@ message PingWebhookRequest {
 
 message PingWebhookResponse {
   WebhookDelivery delivery = 1;
+}
+
+message ReplayEventsRequest {
+  string endpoint_id = 1;
+  // One attempt's events. Or leave it empty and give a window.
+  string attempt_id = 2;
+  // The window, unix milliseconds, from inclusive and to exclusive. Within
+  // the 30 days the log is kept.
+  int64 from = 3;
+  int64 to = 4;
+}
+
+message ReplayEventsResponse {
+  // Events queued to send again.
+  int32 queued = 1;
+  // Events already waiting to be sent, left as they are.
+  int32 already_pending = 2;
 }
