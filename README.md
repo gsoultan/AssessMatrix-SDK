@@ -89,8 +89,12 @@ http.Handle("/hooks/assessmatrix", webhook.Handler(func(ctx context.Context, e *
 - The handler answers 401 to a request not signed with `secret`, or signed more than five
   minutes ago. While rotating, pass both secrets, newest first.
 - Return an error to have the server try again later (ten tries over about four hours).
-- Delivery is at least once and **not ordered**: de-duplicate on `Event.ID` and order by
-  `Event.CreatedAt`.
+- Delivery is at least once: de-duplicate on `Event.ID`. One attempt's events, and its
+  credential's, arrive in the order they happened; order anything else by `Event.CreatedAt`.
+- `attempt.submitted`, `attempt.expired` and `attempt.scored` carry `Score` and `Items`, each
+  question's points out of the points its author set (`Points` is nil while an essay waits).
+- `client.Webhooks.ReplayEvents` sends an endpoint one attempt's events, or a time window's,
+  again with their original ids.
 - Payloads carry ids, versions, times and scores only. Fetch names and answers through the API.
 
 | Event | Data |
