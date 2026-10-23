@@ -472,8 +472,15 @@ type Item struct {
 	AllowAnswerImage bool     `protobuf:"varint,9,opt,name=allow_answer_image,json=allowAnswerImage,proto3" json:"allow_answer_image,omitempty"`
 	Required         bool     `protobuf:"varint,10,opt,name=required,proto3" json:"required,omitempty"`
 	Scale            *Scale   `protobuf:"bytes,11,opt,name=scale,proto3" json:"scale,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Multiple answer only: each keyed option picked earns its share of the
+	// points and each wrong option picked takes one share back, rounded down
+	// and never below zero. Off, only the exact set earns anything.
+	PartialCredit bool `protobuf:"varint,12,opt,name=partial_credit,json=partialCredit,proto3" json:"partial_credit,omitempty"`
+	// Points taken off the total for a wrong answer, 0 to points. A blank
+	// answer costs nothing, and the total never goes below zero.
+	Penalty       int32 `protobuf:"varint,13,opt,name=penalty,proto3" json:"penalty,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Item) Reset() {
@@ -581,6 +588,20 @@ func (x *Item) GetScale() *Scale {
 		return x.Scale
 	}
 	return nil
+}
+
+func (x *Item) GetPartialCredit() bool {
+	if x != nil {
+		return x.PartialCredit
+	}
+	return false
+}
+
+func (x *Item) GetPenalty() int32 {
+	if x != nil {
+		return x.Penalty
+	}
+	return 0
 }
 
 type Section struct {
@@ -1687,7 +1708,7 @@ const file_assessmatrix_v1_exam_proto_rawDesc = "" +
 	"\x05Scale\x12\x16\n" +
 	"\x06points\x18\x01 \x01(\x05R\x06points\x12\x1b\n" +
 	"\tmin_label\x18\x02 \x01(\tR\bminLabel\x12\x1b\n" +
-	"\tmax_label\x18\x03 \x01(\tR\bmaxLabel\"\xfa\x02\n" +
+	"\tmax_label\x18\x03 \x01(\tR\bmaxLabel\"\xbb\x03\n" +
 	"\x04Item\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x19.assessmatrix.v1.ItemTypeR\x04type\x12\x12\n" +
@@ -1700,7 +1721,9 @@ const file_assessmatrix_v1_exam_proto_rawDesc = "" +
 	"\x12allow_answer_image\x18\t \x01(\bR\x10allowAnswerImage\x12\x1a\n" +
 	"\brequired\x18\n" +
 	" \x01(\bR\brequired\x12,\n" +
-	"\x05scale\x18\v \x01(\v2\x16.assessmatrix.v1.ScaleR\x05scale\"t\n" +
+	"\x05scale\x18\v \x01(\v2\x16.assessmatrix.v1.ScaleR\x05scale\x12%\n" +
+	"\x0epartial_credit\x18\f \x01(\bR\rpartialCredit\x12\x18\n" +
+	"\apenalty\x18\r \x01(\x05R\apenalty\"t\n" +
 	"\aSection\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
