@@ -95,6 +95,19 @@ type Attempt struct {
 	SubmittedAt  *time.Time `json:"submitted_at,omitempty"`
 	// Set once the attempt is handed in or scored.
 	Score *Score `json:"score,omitempty"`
+	// Each scored question, in the instrument's order, with the score.
+	Items []ItemScore `json:"items,omitempty"`
+	// The list was too long to send; fetch the attempt through the API.
+	ItemsOmitted bool `json:"items_omitted,omitempty"`
+}
+
+// ItemScore is one question's result.
+type ItemScore struct {
+	ItemID string `json:"item_id"`
+	// Nil while an essay waits for a person to score it.
+	Points *int32 `json:"points"`
+	// What the author set the question to be worth.
+	Max int32 `json:"max"`
 }
 
 // Exam is the data of exam.published.

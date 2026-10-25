@@ -57,6 +57,9 @@ const (
 	// WebhookServicePingWebhookProcedure is the fully-qualified name of the WebhookService's
 	// PingWebhook RPC.
 	WebhookServicePingWebhookProcedure = "/assessmatrix.v1.WebhookService/PingWebhook"
+	// WebhookServiceReplayEventsProcedure is the fully-qualified name of the WebhookService's
+	// ReplayEvents RPC.
+	WebhookServiceReplayEventsProcedure = "/assessmatrix.v1.WebhookService/ReplayEvents"
 )
 
 // WebhookServiceClient is a client for the assessmatrix.v1.WebhookService service.
@@ -73,6 +76,10 @@ type WebhookServiceClient interface {
 	Redeliver(context.Context, *connect.Request[v1.RedeliverRequest]) (*connect.Response[v1.RedeliverResponse], error)
 	// Queues a webhook.ping to one endpoint, to check the receiver end to end.
 	PingWebhook(context.Context, *connect.Request[v1.PingWebhookRequest]) (*connect.Response[v1.PingWebhookResponse], error)
+	// Sends one endpoint every logged event about one attempt, or from a time
+	// window, again: for a receiver that was down or lost data. Each keeps its
+	// original id and body. Only types the endpoint subscribes to are sent.
+	ReplayEvents(context.Context, *connect.Request[v1.ReplayEventsRequest]) (*connect.Response[v1.ReplayEventsResponse], error)
 }
 
 // NewWebhookServiceClient constructs a client for the assessmatrix.v1.WebhookService service. By
@@ -134,6 +141,12 @@ func NewWebhookServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(webhookServiceMethods.ByName("PingWebhook")),
 			connect.WithClientOptions(opts...),
 		),
+		replayEvents: connect.NewClient[v1.ReplayEventsRequest, v1.ReplayEventsResponse](
+			httpClient,
+			baseURL+WebhookServiceReplayEventsProcedure,
+			connect.WithSchema(webhookServiceMethods.ByName("ReplayEvents")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -147,6 +160,7 @@ type webhookServiceClient struct {
 	listDeliveries      *connect.Client[v1.ListDeliveriesRequest, v1.ListDeliveriesResponse]
 	redeliver           *connect.Client[v1.RedeliverRequest, v1.RedeliverResponse]
 	pingWebhook         *connect.Client[v1.PingWebhookRequest, v1.PingWebhookResponse]
+	replayEvents        *connect.Client[v1.ReplayEventsRequest, v1.ReplayEventsResponse]
 }
 
 // ListWebhooks calls assessmatrix.v1.WebhookService.ListWebhooks.
@@ -189,6 +203,11 @@ func (c *webhookServiceClient) PingWebhook(ctx context.Context, req *connect.Req
 	return c.pingWebhook.CallUnary(ctx, req)
 }
 
+// ReplayEvents calls assessmatrix.v1.WebhookService.ReplayEvents.
+func (c *webhookServiceClient) ReplayEvents(ctx context.Context, req *connect.Request[v1.ReplayEventsRequest]) (*connect.Response[v1.ReplayEventsResponse], error) {
+	return c.replayEvents.CallUnary(ctx, req)
+}
+
 // WebhookServiceHandler is an implementation of the assessmatrix.v1.WebhookService service.
 type WebhookServiceHandler interface {
 	ListWebhooks(context.Context, *connect.Request[v1.ListWebhooksRequest]) (*connect.Response[v1.ListWebhooksResponse], error)
@@ -203,6 +222,10 @@ type WebhookServiceHandler interface {
 	Redeliver(context.Context, *connect.Request[v1.RedeliverRequest]) (*connect.Response[v1.RedeliverResponse], error)
 	// Queues a webhook.ping to one endpoint, to check the receiver end to end.
 	PingWebhook(context.Context, *connect.Request[v1.PingWebhookRequest]) (*connect.Response[v1.PingWebhookResponse], error)
+	// Sends one endpoint every logged event about one attempt, or from a time
+	// window, again: for a receiver that was down or lost data. Each keeps its
+	// original id and body. Only types the endpoint subscribes to are sent.
+	ReplayEvents(context.Context, *connect.Request[v1.ReplayEventsRequest]) (*connect.Response[v1.ReplayEventsResponse], error)
 }
 
 // NewWebhookServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -260,6 +283,12 @@ func NewWebhookServiceHandler(svc WebhookServiceHandler, opts ...connect.Handler
 		connect.WithSchema(webhookServiceMethods.ByName("PingWebhook")),
 		connect.WithHandlerOptions(opts...),
 	)
+	webhookServiceReplayEventsHandler := connect.NewUnaryHandler(
+		WebhookServiceReplayEventsProcedure,
+		svc.ReplayEvents,
+		connect.WithSchema(webhookServiceMethods.ByName("ReplayEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/assessmatrix.v1.WebhookService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case WebhookServiceListWebhooksProcedure:
@@ -278,6 +307,8 @@ func NewWebhookServiceHandler(svc WebhookServiceHandler, opts ...connect.Handler
 			webhookServiceRedeliverHandler.ServeHTTP(w, r)
 		case WebhookServicePingWebhookProcedure:
 			webhookServicePingWebhookHandler.ServeHTTP(w, r)
+		case WebhookServiceReplayEventsProcedure:
+			webhookServiceReplayEventsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -317,4 +348,8 @@ func (UnimplementedWebhookServiceHandler) Redeliver(context.Context, *connect.Re
 
 func (UnimplementedWebhookServiceHandler) PingWebhook(context.Context, *connect.Request[v1.PingWebhookRequest]) (*connect.Response[v1.PingWebhookResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.WebhookService.PingWebhook is not implemented"))
+}
+
+func (UnimplementedWebhookServiceHandler) ReplayEvents(context.Context, *connect.Request[v1.ReplayEventsRequest]) (*connect.Response[v1.ReplayEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.WebhookService.ReplayEvents is not implemented"))
 }
