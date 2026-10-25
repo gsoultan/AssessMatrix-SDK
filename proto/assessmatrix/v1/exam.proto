@@ -78,6 +78,13 @@ message Item {
   bool allow_answer_image = 9;
   bool required = 10;
   Scale scale = 11;
+  // Multiple answer only: each keyed option picked earns its share of the
+  // points and each wrong option picked takes one share back, rounded down
+  // and never below zero. Off, only the exact set earns anything.
+  bool partial_credit = 12;
+  // Points taken off the total for a wrong answer, 0 to points. A blank
+  // answer costs nothing, and the total never goes below zero.
+  int32 penalty = 13;
 }
 
 message Section {
