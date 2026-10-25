@@ -108,6 +108,9 @@ type ItemScore struct {
 	Points *int32 `json:"points"`
 	// What the author set the question to be worth.
 	Max int32 `json:"max"`
+	// Points a wrong answer took off the total; zero unless the question
+	// carries a penalty and the answer earned nothing.
+	Penalty int32 `json:"penalty,omitempty"`
 }
 
 // Exam is the data of exam.published.

@@ -115,7 +115,8 @@ func TestDecodeData(t *testing.T) {
 		"attempt_id":"a1","assignment_id":"s1","exam_id":"x1","exam_version":3,"person_id":"p1",
 		"started_at":"2026-01-01T09:00:00Z","submitted_at":"2026-01-01T09:40:00Z",
 		"score":{"pct":80,"points":8,"max":10,"passed":true,"pending_review":false},
-		"items":[{"item_id":"q1","points":8,"max":8},{"item_id":"q2","points":null,"max":2}]}`)}
+		"items":[{"item_id":"q1","points":8,"max":8},{"item_id":"q2","points":null,"max":2},
+			{"item_id":"q3","points":0,"max":2,"penalty":1}]}`)}
 	a, err := e.Attempt()
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +125,8 @@ func TestDecodeData(t *testing.T) {
 		a.Score == nil || a.Score.Pct != 80 || !a.Score.Passed {
 		t.Fatalf("attempt = %+v", a)
 	}
-	if len(a.Items) != 2 || a.Items[0].Points == nil || *a.Items[0].Points != 8 || a.Items[1].Points != nil || a.Items[1].Max != 2 {
+	if len(a.Items) != 3 || a.Items[0].Points == nil || *a.Items[0].Points != 8 || a.Items[1].Points != nil || a.Items[1].Max != 2 ||
+		a.Items[0].Penalty != 0 || a.Items[2].Penalty != 1 {
 		t.Fatalf("items = %+v", a.Items)
 	}
 	if _, err := e.Invitation(); err == nil {
